@@ -1,0 +1,23 @@
+[
+  {"query": "ok I'm in TurboTax and it's asking me for my capital loss carryover from last year. I have my 2024 return PDF somewhere in this folder. Can you pull the exact numbers from Form 1040 line 15 and Schedule D lines 7, 15, and 21 and show me screenshots so I know I'm entering the right thing?", "should_trigger": true},
+  {"query": "verify the indemnification cap is $2M and the notice period is 60 days in the signed MSA — I need to see the actual text from the contract before I send this to legal", "should_trigger": true},
+  {"query": "something doesn't add up on this vendor invoice. the PO says $14,500 but I think the invoice total is different. can you check both PDFs and show me proof of what each one actually says?", "should_trigger": true},
+  {"query": "I just got my W-2 and 1099 from Schwab. Before I file, double-check that the federal wages on the W-2 and the dividends total on the 1099 match what I wrote down. Screenshot proof please", "should_trigger": true},
+  {"query": "where does the $47,000 deductible come from in this insurance policy? show me exactly where it says that in the PDF", "should_trigger": true},
+  {"query": "I scanned a bunch of old receipts and need to find the one that has a $312.50 total — it's for an expense report and I need a screenshot showing the amount", "should_trigger": true},
+  {"query": "my accountant sent me a PDF of my return but I want to confirm the numbers match what she told me on the phone. the AGI should be $189,450 and total tax $31,200. can you show me where those appear?", "should_trigger": true},
+  {"query": "we're doing an audit and I need to trace each line item back to its source document. here are 3 invoices — can you create a proof page showing where each amount comes from?", "should_trigger": true},
+  {"query": "the grant agreement says the funding cap is $750,000 but the budget spreadsheet shows $800,000. can you pull screenshots from the PDF agreement proving what the actual cap is?", "should_trigger": true},
+  {"query": "confirm these stats from the methodology section match what's reported in the results: n=1,247, p<0.001, effect size d=0.45. show me both places in the PDF", "should_trigger": true},
+
+  {"query": "can you read this PDF and give me a summary of what it says? it's a contract for a new vendor", "should_trigger": false},
+  {"query": "I need to merge these 3 PDFs into a single file — the tax return, the W-2, and the 1099", "should_trigger": false},
+  {"query": "extract all the text from this invoice PDF into a spreadsheet with columns for item, quantity, and price", "should_trigger": false},
+  {"query": "fill in this PDF form with my name and address — it's a rental application", "should_trigger": false},
+  {"query": "create a PDF report from this data showing monthly revenue trends with charts", "should_trigger": false},
+  {"query": "can you convert this Word doc to PDF format?", "should_trigger": false},
+  {"query": "help me calculate my estimated taxes for Q2 based on my YTD income", "should_trigger": false},
+  {"query": "split this 50-page PDF into individual chapter files based on the bookmarks", "should_trigger": false},
+  {"query": "make a nice-looking invoice PDF for my freelance work — $3,500 for web design services to Acme Corp", "should_trigger": false},
+  {"query": "I have a spreadsheet of expenses and I need to match each row to the right receipt PDF. can you organize them into folders?", "should_trigger": false}
+]
