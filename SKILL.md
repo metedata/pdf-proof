@@ -17,6 +17,8 @@ When a user needs to verify that specific values match their source PDF document
 
 The output is a standalone HTML file that references cropped PNG screenshots — a visual audit trail the user can keep, share, or refer back to.
 
+**Important:** Always generate the HTML proof page in your first response. Do not just show screenshots inline or summarize values in chat — the shareable proof document is the whole point. Find, extract, and assemble the proof page in one pass.
+
 ## How It Works
 
 The key insight is using PyMuPDF's `page.search_for(text)` to get **exact PDF-coordinate rectangles** for each value, then using those coordinates to draw highlights at mathematically precise positions. This avoids the problem of CSS-percentage-based overlays that never quite land in the right spot.
@@ -108,6 +110,8 @@ When using `--mode verify --json`, the output includes:
 **If verification fails**, the highlighted region may contain the wrong text. Re-run with `--mode find` to inspect all matches and use `--match-index` to select the correct one.
 
 #### 4. Generate the HTML proof page
+
+**The HTML proof page is the primary deliverable of this skill — always generate it.** Do not stop at showing inline screenshots or summarizing values in chat. The whole point is a standalone, shareable proof document. Generate the HTML proof page in your first response, not as an afterthought.
 
 After creating all the cropped screenshots, generate an HTML file. Read the template from `assets/proof_template.html` and populate it. The template expects a JSON data structure — see the template comments for the schema.
 
