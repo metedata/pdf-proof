@@ -11,7 +11,7 @@ When a user needs to verify that specific values match their source PDF document
 
 1. Searches the PDF(s) for the exact text of each value
 2. Crops a tight, readable section around each match
-3. Draws a precise red highlight box around the found value (using exact text coordinates, not guesswork)
+3. Draws a translucent green highlight over the found value (using exact text coordinates, not guesswork)
 4. Cross-checks by reading text back from the highlighted region to confirm correctness
 5. Generates a clean HTML proof page with a summary table, confidence indicators, and per-value proof cards showing the actual screenshots
 

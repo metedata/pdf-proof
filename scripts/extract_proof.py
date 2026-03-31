@@ -3,7 +3,7 @@
 extract_proof.py — Extract cropped, highlighted screenshots from PDF documents.
 
 Uses PyMuPDF's text search to find exact coordinates, then renders a cropped
-section of the page with a precise red highlight around the found text.
+section of the page with a translucent green highlight over the found text.
 
 Modes:
   find    — Locate where text appears in a PDF (page numbers + coordinates)
@@ -320,10 +320,8 @@ def extract_crop(pdf_path, search_text, page_num, output_path,
     pix = page.get_pixmap(matrix=mat, clip=crop)
     img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
 
-    # Draw highlight — border only, no fill, so text stays readable
+    # Draw highlight — semi-transparent fill (marker-pen style)
     if highlight != "none":
-        draw = ImageDraw.Draw(img)
-
         if highlight == "value":
             hx0 = (text_rect.x0 - pad - crop_x0) * scale
             hy0 = (text_rect.y0 - pad - crop_y0) * scale
@@ -335,10 +333,14 @@ def extract_crop(pdf_path, search_text, page_num, output_path,
             hx1 = (crop_x1 - 5 - crop_x0) * scale
             hy1 = (text_rect.y1 + pad - crop_y0) * scale
 
-        # Draw red border (3px thick, no fill)
-        for i in range(3):
-            draw.rectangle([hx0 - i, hy0 - i, hx1 + i, hy1 + i],
-                           outline=(220, 38, 38))
+        # Composite a translucent green highlight over the region
+        overlay = Image.new("RGBA", img.size, (0, 0, 0, 0))
+        overlay_draw = ImageDraw.Draw(overlay)
+        overlay_draw.rectangle(
+            [hx0, hy0, hx1, hy1],
+            fill=(74, 222, 128, 80),  # soft green, ~31% opacity
+        )
+        img = Image.alpha_composite(img.convert("RGBA"), overlay).convert("RGB")
 
     # Save
     os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)

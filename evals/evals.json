@@ -6,12 +6,12 @@
       "id": 1,
       "name": "tax-return-multi-value",
       "prompt": "Double-check these values against my tax return and provide backup proof: Form 1040 line 15 (taxable income), Schedule D line 7 (net short-term gain/loss), Schedule D line 15 (net long-term gain/loss), Schedule D line 21 (allowable loss)",
-      "expected_output": "HTML proof page with 4 proof cards showing cropped screenshots from the tax return PDF, each with a precise red highlight on the correct value. Summary table at top with all 4 values. Confidence indicators for each.",
+      "expected_output": "HTML proof page with 4 proof cards showing cropped screenshots from the tax return PDF, each with a precise green highlight on the correct value. Summary table at top with all 4 values. Confidence indicators for each.",
       "files": ["<your-tax-return.pdf>"],
       "expectations": [
         "An HTML file was created containing proof cards",
         "Exactly 4 PNG screenshot images were generated",
-        "Each screenshot has a visible red highlight box around a numeric value",
+        "Each screenshot has a visible green highlight box around a numeric value",
         "The HTML contains a summary table with rows for all 4 values",
         "The script used --mode find before --mode extract or --mode verify",
         "Schedule D line 21 highlights the form field value (rightmost match), not instruction text",
@@ -24,11 +24,11 @@
       "id": 2,
       "name": "single-value-financial",
       "prompt": "Can you verify the ordinary dividends total on my 1099-DIV is $9,428.18? Show me a screenshot from the actual form.",
-      "expected_output": "HTML proof page or inline screenshot showing cropped section of the 1099-DIV with $9,428.18 highlighted in red.",
+      "expected_output": "HTML proof page or inline screenshot showing cropped section of the 1099-DIV with $9,428.18 highlighted.",
       "files": ["<your-1099-div.pdf>"],
       "expectations": [
         "At least 1 PNG screenshot was generated",
-        "The screenshot shows a red highlight box around the value 9,428.18",
+        "The screenshot shows a green highlight box around the value 9,428.18",
         "The script reported high confidence (single match expected)",
         "If --mode verify was used, verification status is 'pass'"
       ],
@@ -43,7 +43,7 @@
       "expectations": [
         "An HTML file was created with exactly 2 proof cards",
         "2 PNG screenshots were generated (one per value)",
-        "Each screenshot has a red highlight on the correct value",
+        "Each screenshot has a green highlight on the correct value",
         "The HTML summary table includes both wages and withholding",
         "Both values match what was requested (no swapped fields)"
       ],

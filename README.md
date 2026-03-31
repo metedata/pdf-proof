@@ -10,7 +10,7 @@ Given a PDF and a value to verify, the skill:
 
 1. **Finds** the exact text coordinates using PyMuPDF's text search
 2. **Crops** a readable section of the page around the match
-3. **Highlights** the value with a precise red border (no overlapping, no guesswork)
+3. **Highlights** the value with a translucent green highlight (no overlapping borders, no guesswork)
 4. **Verifies** by reading text back from the highlighted region to confirm correctness
 5. **Scores confidence** — single match = high, auto-selected from multiple = medium, OCR or failed verification = low
 6. **Assembles** an HTML proof page with a summary table and per-value proof cards

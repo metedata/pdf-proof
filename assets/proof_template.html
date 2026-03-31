@@ -28,9 +28,9 @@
   .proof-body p { line-height: 1.6; margin-bottom: 0.75rem; }
   .highlight { background: #fef3c7; padding: 0.15rem 0.35rem; border-radius: 3px; font-weight: 600; }
 
-  .screenshot { margin: 1rem 0; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; }
+  .screenshot { margin: 1rem 0; border: 1px solid #d1d5db; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.12), 0 1px 3px rgba(0,0,0,0.06); background: #f8fafc; }
   .screenshot img { width: 100%; display: block; }
-  .screenshot-caption { background: #f8fafc; padding: 0.5rem 1rem; font-size: 0.8rem; color: #64748b; border-top: 1px solid #e2e8f0; }
+  .screenshot-caption { background: #f1f5f9; padding: 0.5rem 1rem; font-size: 0.8rem; color: #64748b; border-top: 1px solid #d1d5db; }
 
   .verification { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 1.25rem; margin-top: 1rem; }
   .verification h4 { color: #166534; margin-bottom: 0.5rem; font-size: 0.9rem; }
@@ -68,7 +68,7 @@ The CONTENT section is built from a JSON structure like:
       "source": "Vendor Invoice PDF, page 1",
       "description": "The total amount appears at the bottom of the invoice.",
       "screenshot": "proof_invoice_total.png",
-      "caption": "Vendor Invoice — red box highlights total amount",
+      "caption": "Vendor Invoice — highlight marks total amount",
       "confidence": "high",
       "confidence_label": "Verified",
       "verification": null
