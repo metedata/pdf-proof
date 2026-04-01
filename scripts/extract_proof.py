@@ -29,6 +29,35 @@ import json
 import sys
 import os
 import re
+import unicodedata
+
+
+# ---------------------------------------------------------------------------
+# Text normalization helpers
+# ---------------------------------------------------------------------------
+
+_LIGATURE_MAP = {
+    "\ufb00": "ff",
+    "\ufb01": "fi",
+    "\ufb02": "fl",
+    "\ufb03": "ffi",
+    "\ufb04": "ffl",
+    "\ufb05": "st",
+    "\ufb06": "st",
+}
+
+_INVISIBLE_CHARS = "\u00ad\u200b\u200c\u200d\u2060\ufeff"
+
+
+def _normalize_text_for_search(text):
+    """Normalize text for searching: Unicode NFC, ligature decomposition,
+    and invisible character removal."""
+    text = unicodedata.normalize("NFC", text)
+    for lig, replacement in _LIGATURE_MAP.items():
+        text = text.replace(lig, replacement)
+    for ch in _INVISIBLE_CHARS:
+        text = text.replace(ch, "")
+    return text
 
 
 def ensure_dependencies():
@@ -115,6 +144,12 @@ def find_text(pdf_path, search_text, page_num=None, ocr=False):
         # Try normal text search first
         areas = page.search_for(search_text)
 
+        # If no results, try text-normalized form (Unicode NFC, ligatures, etc.)
+        if not areas:
+            normalized = _normalize_text_for_search(search_text)
+            if normalized != search_text:
+                areas = page.search_for(normalized)
+
         # If no results and OCR is enabled, try OCR on pages without text
         if not areas and ocr and not _has_text_layer(page):
             print(f"  Page {p_idx + 1}: no text layer detected, running OCR...",
@@ -174,6 +209,44 @@ def _select_match(areas, match_index, prefer, search_text, page_num):
     return selected, sel_idx, "medium", f"Auto-selected ({prefer}) from {len(areas)} matches"
 
 
+def _find_text_in_page(page, search_text):
+    """Extract full page text and find the search string with flexible matching.
+
+    Strips invisible characters and normalizes Unicode on both sides, then
+    returns the *actual text as it appears in the PDF* so it can be fed back
+    to page.search_for() for precise coordinates.  Returns None if not found.
+    """
+    page_text = page.get_text("text")
+    if not page_text:
+        return None
+
+    norm_page = unicodedata.normalize("NFC", page_text)
+    norm_search = _normalize_text_for_search(search_text)
+
+    # Fast path: case-insensitive find on NFC-normalized text
+    idx = norm_page.lower().find(norm_search.lower())
+    if idx >= 0:
+        return norm_page[idx:idx + len(norm_search)]
+
+    # Slow path: strip invisible chars, build index map back to original
+    invisible = set(_INVISIBLE_CHARS)
+    clean_map = []  # clean_idx -> original_idx
+    clean_chars = []
+    for orig_idx, ch in enumerate(norm_page):
+        if ch not in invisible:
+            clean_map.append(orig_idx)
+            clean_chars.append(ch)
+    clean_text = "".join(clean_chars)
+
+    idx = clean_text.lower().find(norm_search.lower())
+    if idx >= 0 and idx + len(norm_search) <= len(clean_map):
+        orig_start = clean_map[idx]
+        orig_end = clean_map[idx + len(norm_search) - 1] + 1
+        return norm_page[orig_start:orig_end]
+
+    return None
+
+
 def _try_variations(page, search_text, ocr=False):
     """Try common formatting variations of the search text.
 
@@ -184,11 +257,26 @@ def _try_variations(page, search_text, ocr=False):
     def _search(text):
         return page.search_for(text)
 
-    # Exact match first
+    # Phase 0: Exact match
     areas = _search(search_text)
     if areas:
         return areas, search_text, False, False
 
+    # Phase 1: Text-normalized search (Unicode NFC, ligatures, invisible chars)
+    normalized = _normalize_text_for_search(search_text)
+    if normalized != search_text:
+        areas = _search(normalized)
+        if areas:
+            return areas, normalized, True, False
+
+    # Phase 2: Page-text-extraction fallback — find actual PDF string flexibly
+    found_actual = _find_text_in_page(page, search_text)
+    if found_actual and found_actual != search_text and found_actual != normalized:
+        areas = _search(found_actual)
+        if areas:
+            return areas, found_actual, True, False
+
+    # Phase 3: Numeric/financial formatting variations
     variations = [
         search_text.replace(",", ""),
         f"({search_text})",
@@ -199,8 +287,9 @@ def _try_variations(page, search_text, ocr=False):
         search_text.replace("$", ""),
         search_text.replace("$", "").replace(",", ""),
     ]
-    # Deduplicate while preserving order
-    seen = {search_text}
+    seen = {search_text, normalized}
+    if found_actual:
+        seen.add(found_actual)
     for v in variations:
         if v not in seen:
             seen.add(v)
@@ -208,20 +297,18 @@ def _try_variations(page, search_text, ocr=False):
             if areas:
                 return areas, v, True, False
 
-    # If still nothing found and OCR is enabled, try OCR
+    # Phase 4: OCR fallback (for scanned/image-only pages)
     if ocr and not _has_text_layer(page):
         print(f"  No text layer — running OCR...", file=sys.stderr)
         areas, ocr_ok = _ocr_search(page, search_text)
         if areas:
             return areas, search_text, False, True
-        # Try variations on OCR text too
         if ocr_ok:
             for v in variations:
-                if v not in seen:
-                    continue  # already deduped above
-                areas, _ = _ocr_search(page, v)
-                if areas:
-                    return areas, v, True, True
+                if v in seen:
+                    areas, _ = _ocr_search(page, v)
+                    if areas:
+                        return areas, v, True, True
 
     return [], None, False, False
 
@@ -248,7 +335,9 @@ def _read_text_at_rect(page, rect, expand=2):
 
 
 def _normalize_for_comparison(text):
-    """Normalize text for fuzzy comparison (strip whitespace, punctuation, case)."""
+    """Normalize text for fuzzy comparison (Unicode, ligatures, invisible chars,
+    whitespace, punctuation, case)."""
+    text = _normalize_text_for_search(text)
     return re.sub(r"[\s,$().%-]+", "", text).lower()
 
 
