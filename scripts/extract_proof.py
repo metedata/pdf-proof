@@ -342,7 +342,7 @@ def _normalize_for_comparison(text):
 
 
 def extract_crop(pdf_path, search_text, page_num, output_path,
-                 highlight="value", context=80, scale=3, pad=8,
+                 highlight="value", context=80, scale=5, pad=8,
                  margin_left=30, margin_right=10, match_index=None,
                  prefer="right", verify=False, ocr=False):
     """
@@ -532,8 +532,8 @@ def main():
                         help="Highlight style")
     parser.add_argument("--context", type=int, default=80,
                         help="Vertical context in PDF points (default: 80)")
-    parser.add_argument("--scale", type=int, default=3,
-                        help="Render scale factor (default: 3)")
+    parser.add_argument("--scale", type=int, default=5,
+                        help="Render scale factor (default: 5)")
     parser.add_argument("--prefer", default="right",
                         choices=["right", "first", "last"],
                         help="When multiple matches: 'right' (rightmost, best for "
