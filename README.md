@@ -47,13 +47,6 @@ cp -r pdf-proof .claude/skills/
 
 Skills are picked up automatically — no restart needed.
 
-### Sharing with your team
-
-Want others on your team to have this skill?
-
-- **Git** — commit the `pdf-proof/` folder to `.claude/skills/` in your repo. Anyone who clones it gets the skill automatically.
-- **Zip** — share the zip directly; recipients install via the methods above.
-
 ### Dependencies
 
 Python dependencies (PyMuPDF, Pillow) are installed automatically — no manual setup needed.
