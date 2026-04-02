@@ -349,26 +349,15 @@ def extract_crop(pdf_path, search_text, page_num, output_path,
     Extract a cropped region from a PDF page centered on the found text,
     with a precise highlight drawn at the exact text coordinates.
 
-    Args:
-        pdf_path: Path to the PDF
-        search_text: Text to find and highlight
-        page_num: 1-indexed page number
-        output_path: Where to save the PNG
-        highlight: "value" (tight box), "row" (full-width band), or "none"
-        context: PDF points of vertical context above/below the text
-        scale: Render scale factor (3 = high-res)
-        pad: Padding around highlight box in PDF points
-        margin_left: Left margin in PDF points
-        margin_right: Right margin from page edge in PDF points
-        match_index: If set, use the Nth match (0-indexed). Otherwise auto-select.
-        prefer: "right" (best for forms), "first", or "last"
-        verify: If True, read back text from the highlighted region and
-                cross-check against search_text
-        ocr: If True, fall back to Tesseract OCR for scanned/image-only pages
+    search_text can be a single string or a list of strings. When a list is
+    given, each term gets its own highlight and the crop spans all of them.
 
     Returns:
         dict with result info including confidence and optional verification
     """
+    # Normalise to list so the rest of the code is uniform
+    search_terms = [search_text] if isinstance(search_text, str) else list(search_text)
+
     doc = fitz.open(pdf_path)
     page_idx = page_num - 1
 
@@ -377,109 +366,142 @@ def extract_crop(pdf_path, search_text, page_num, output_path,
         return {"error": f"Page {page_num} out of range (PDF has {len(doc)} pages)"}
 
     page = doc[page_idx]
-    areas, variation_used, is_fallback, used_ocr = _try_variations(
-        page, search_text, ocr=ocr
-    )
-
-    if not areas:
-        doc.close()
-        return {"error": f"Text '{search_text}' not found on page {page_num}"}
-
-    text_rect, sel_idx, confidence, confidence_note = _select_match(
-        areas, match_index, prefer, search_text, page_num
-    )
-
-    # Downgrade confidence if we had to use a variation
-    if is_fallback and confidence == "high":
-        confidence = "medium"
-        confidence_note += f" (matched variation '{variation_used}')"
-
     page_rect = page.rect
 
-    # Calculate crop region
+    # --- locate every search term and pick the best match for each ----------
+    matched_rects = []   # (rect, term, sel_idx, confidence, note, variation)
+    errors = []
+
+    for term in search_terms:
+        areas, variation_used, is_fallback, used_ocr = _try_variations(
+            page, term, ocr=ocr
+        )
+        if not areas:
+            errors.append(term)
+            continue
+
+        text_rect, sel_idx, confidence, confidence_note = _select_match(
+            areas, match_index, prefer, term, page_num
+        )
+        if is_fallback and confidence == "high":
+            confidence = "medium"
+            confidence_note += f" (matched variation '{variation_used}')"
+        if used_ocr and confidence == "high":
+            confidence = "medium"
+            confidence_note += " (via OCR)"
+
+        matched_rects.append({
+            "rect": text_rect,
+            "term": term,
+            "sel_idx": sel_idx,
+            "total_matches": len(areas),
+            "confidence": confidence,
+            "confidence_note": confidence_note,
+            "variation": variation_used if is_fallback else None,
+            "ocr": used_ocr,
+        })
+
+    if not matched_rects:
+        doc.close()
+        return {"error": f"Text not found on page {page_num}: {errors}"}
+
+    # --- compute crop region spanning all matched rects ---------------------
+    all_y0 = min(m["rect"].y0 for m in matched_rects)
+    all_y1 = max(m["rect"].y1 for m in matched_rects)
+
     crop_x0 = margin_left
-    crop_y0 = max(0, text_rect.y0 - context)
+    crop_y0 = max(0, all_y0 - context)
     crop_x1 = page_rect.width - margin_right
-    crop_y1 = min(page_rect.height, text_rect.y1 + context)
+    crop_y1 = min(page_rect.height, all_y1 + context)
 
     crop = fitz.Rect(crop_x0, crop_y0, crop_x1, crop_y1)
 
-    # Render the cropped region
+    # --- render -------------------------------------------------------------
     mat = fitz.Matrix(scale, scale)
     pix = page.get_pixmap(matrix=mat, clip=crop)
     img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
 
-    # Draw highlight — semi-transparent fill (marker-pen style)
+    # --- draw highlights for every matched rect ----------------------------
     if highlight != "none":
-        if highlight == "value":
-            hx0 = (text_rect.x0 - pad - crop_x0) * scale
-            hy0 = (text_rect.y0 - pad - crop_y0) * scale
-            hx1 = (text_rect.x1 + pad - crop_x0) * scale
-            hy1 = (text_rect.y1 + pad - crop_y0) * scale
-        elif highlight == "row":
-            hx0 = (crop_x0 + 5 - crop_x0) * scale
-            hy0 = (text_rect.y0 - pad - crop_y0) * scale
-            hx1 = (crop_x1 - 5 - crop_x0) * scale
-            hy1 = (text_rect.y1 + pad - crop_y0) * scale
-
-        # Composite a translucent green highlight over the region
         overlay = Image.new("RGBA", img.size, (0, 0, 0, 0))
         overlay_draw = ImageDraw.Draw(overlay)
-        overlay_draw.rectangle(
-            [hx0, hy0, hx1, hy1],
-            fill=(74, 222, 128, 80),  # soft green, ~31% opacity
-        )
+
+        for m in matched_rects:
+            r = m["rect"]
+            if highlight == "value":
+                hx0 = (r.x0 - pad - crop_x0) * scale
+                hy0 = (r.y0 - pad - crop_y0) * scale
+                hx1 = (r.x1 + pad - crop_x0) * scale
+                hy1 = (r.y1 + pad - crop_y0) * scale
+            elif highlight == "row":
+                hx0 = (crop_x0 + 5 - crop_x0) * scale
+                hy0 = (r.y0 - pad - crop_y0) * scale
+                hx1 = (crop_x1 - 5 - crop_x0) * scale
+                hy1 = (r.y1 + pad - crop_y0) * scale
+
+            overlay_draw.rectangle(
+                [hx0, hy0, hx1, hy1],
+                fill=(249, 115, 22, 80),  # soft orange, ~31% opacity
+            )
+
         img = Image.alpha_composite(img.convert("RGBA"), overlay).convert("RGB")
 
-    # Save
+    # --- save ---------------------------------------------------------------
     os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
     img.save(output_path)
 
+    # --- build result -------------------------------------------------------
+    primary = matched_rects[0]
     result = {
         "output": output_path,
         "page": page_num,
-        "search_text": search_text,
+        "search_text": search_terms[0] if len(search_terms) == 1 else search_terms,
         "found_at": {
-            "x0": round(text_rect.x0, 2),
-            "y0": round(text_rect.y0, 2),
-            "x1": round(text_rect.x1, 2),
-            "y1": round(text_rect.y1, 2),
+            "x0": round(primary["rect"].x0, 2),
+            "y0": round(primary["rect"].y0, 2),
+            "x1": round(primary["rect"].x1, 2),
+            "y1": round(primary["rect"].y1, 2),
         },
-        "match_index": sel_idx,
-        "total_matches": len(areas),
-        "confidence": confidence,
-        "confidence_note": confidence_note,
+        "highlights": len(matched_rects),
+        "confidence": min((m["confidence"] for m in matched_rects),
+                          key=lambda c: ["high", "medium", "low"].index(c)),
         "image_size": {"width": img.width, "height": img.height},
     }
 
-    if is_fallback:
-        result["matched_variation"] = variation_used
-    if used_ocr:
-        result["ocr"] = True
-        if confidence == "high":
-            result["confidence"] = "medium"
-            result["confidence_note"] += " (via OCR)"
+    if errors:
+        result["not_found"] = errors
 
-    # Verification: read text back from the highlighted region
+    if len(matched_rects) > 1:
+        result["matched_terms"] = [
+            {"term": m["term"],
+             "confidence": m["confidence"],
+             "confidence_note": m["confidence_note"]}
+            for m in matched_rects
+        ]
+
+    # --- verification (for each term) --------------------------------------
     if verify:
-        readback = _read_text_at_rect(page, text_rect)
-        norm_search = _normalize_for_comparison(search_text)
-        norm_readback = _normalize_for_comparison(readback)
-        text_match = norm_search in norm_readback or norm_readback in norm_search
+        verifications = []
+        all_pass = True
+        for m in matched_rects:
+            readback = _read_text_at_rect(page, m["rect"])
+            norm_search = _normalize_for_comparison(m["term"])
+            norm_readback = _normalize_for_comparison(readback)
+            text_match = norm_search in norm_readback or norm_readback in norm_search
+            if not text_match:
+                all_pass = False
+                print(f"  VERIFY FAIL: searched '{m['term']}', "
+                      f"readback '{readback}'", file=sys.stderr)
+            verifications.append({
+                "search_text": m["term"],
+                "readback_text": readback,
+                "text_match": text_match,
+                "status": "pass" if text_match else "fail",
+            })
 
-        result["verification"] = {
-            "readback_text": readback,
-            "search_normalized": norm_search,
-            "readback_normalized": norm_readback,
-            "text_match": text_match,
-            "status": "pass" if text_match else "fail",
-        }
-
-        if not text_match:
+        result["verification"] = verifications if len(verifications) > 1 else verifications[0]
+        if not all_pass:
             result["confidence"] = "low"
-            result["confidence_note"] += " | VERIFICATION FAILED: readback mismatch"
-            print(f"  VERIFY FAIL: searched '{search_text}', "
-                  f"readback '{readback}'", file=sys.stderr)
 
     doc.close()
     return result
@@ -494,7 +516,9 @@ def main():
         description="Extract cropped, highlighted screenshots from PDFs"
     )
     parser.add_argument("--pdf", required=True, help="Path to the PDF file")
-    parser.add_argument("--search", required=True, help="Text to search for")
+    parser.add_argument("--search", required=True, nargs="+",
+                        help="Text to search for (multiple terms = multiple "
+                             "highlights on the same screenshot)")
     parser.add_argument("--mode", default="extract",
                         choices=["find", "extract", "verify"],
                         help="'find' to locate text, 'extract' to crop+highlight, "
@@ -524,29 +548,38 @@ def main():
 
     args = parser.parse_args()
 
+    # Normalise: single search term → string, multiple → list
+    search = args.search[0] if len(args.search) == 1 else args.search
+
     if args.mode == "find":
-        results = find_text(args.pdf, args.search, args.page, ocr=args.ocr)
-        if args.json:
+        # Find mode: search for each term
+        terms = args.search
+        all_results = []
+        for term in terms:
+            results = find_text(args.pdf, term, args.page, ocr=args.ocr)
             for r in results:
+                r["search_text"] = term
+            all_results.extend(results)
+        if args.json:
+            for r in all_results:
                 r["rect"] = str(r["rect"])
-            print(json.dumps(results, indent=2))
+            print(json.dumps(all_results, indent=2))
         else:
-            if not results:
-                print(f"Not found: '{args.search}'")
-                if args.page:
-                    print(f"  (searched page {args.page} only)")
-                else:
-                    print(f"  (searched all pages)")
+            if not all_results:
+                print(f"Not found: {terms}")
             else:
-                for r in results:
-                    print(f"  Page {r['page']}: ({r['x0']}, {r['y0']}) "
+                for r in all_results:
+                    print(f"  '{r.get('search_text', '')}' → "
+                          f"Page {r['page']}: ({r['x0']}, {r['y0']}) "
                           f"to ({r['x1']}, {r['y1']})")
 
     elif args.mode in ("extract", "verify"):
         if args.page is None:
-            results = find_text(args.pdf, args.search, ocr=args.ocr)
+            # Auto-find page from first search term
+            first_term = args.search[0]
+            results = find_text(args.pdf, first_term, ocr=args.ocr)
             if not results:
-                print(f"Error: '{args.search}' not found in any page",
+                print(f"Error: '{first_term}' not found in any page",
                       file=sys.stderr)
                 sys.exit(1)
             args.page = results[0]["page"]
@@ -554,7 +587,7 @@ def main():
                 print(f"Auto-found on page {args.page}")
 
         result = extract_crop(
-            args.pdf, args.search, args.page, args.output,
+            args.pdf, search, args.page, args.output,
             highlight=args.highlight,
             context=args.context,
             scale=args.scale,
@@ -573,20 +606,12 @@ def main():
             else:
                 conf = result["confidence"]
                 conf_icon = {"high": "+", "medium": "~", "low": "!"}[conf]
+                n = result.get("highlights", 1)
                 print(f"Saved: {result['output']} "
                       f"({result['image_size']['width']}x"
-                      f"{result['image_size']['height']})")
-                print(f"  Found '{result['search_text']}' at page "
-                      f"{result['page']}, "
-                      f"({result['found_at']['x0']}, "
-                      f"{result['found_at']['y0']})")
-                print(f"  Confidence: [{conf_icon}] {conf} — "
-                      f"{result['confidence_note']}")
-                if "verification" in result:
-                    v = result["verification"]
-                    status = "PASS" if v["status"] == "pass" else "FAIL"
-                    print(f"  Verification: {status} "
-                          f"(readback: '{v['readback_text']}')")
+                      f"{result['image_size']['height']}, "
+                      f"{n} highlight{'s' if n > 1 else ''})")
+                print(f"  Confidence: [{conf_icon}] {conf}")
 
 
 if __name__ == "__main__":

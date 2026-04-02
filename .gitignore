@@ -1,0 +1,7 @@
+# Sample PDFs and generated proof examples (kept local)
+samples/
+proof-*/
+sample-documents.md
+sample-usecases.json
+use-cases.txt
+.DS_Store

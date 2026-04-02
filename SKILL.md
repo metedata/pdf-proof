@@ -11,7 +11,7 @@ When a user needs to verify that specific values match their source PDF document
 
 1. Searches the PDF(s) for the exact text of each value
 2. Crops a tight, readable section around each match
-3. Draws a translucent green highlight over the found value (using exact text coordinates, not guesswork)
+3. Draws a translucent orange highlight over the found value (using exact text coordinates, not guesswork)
 4. Cross-checks by reading text back from the highlighted region to confirm correctness
 5. Generates a clean HTML proof page with a summary table, confidence indicators, and per-value proof cards showing the actual screenshots
 
@@ -51,20 +51,30 @@ Review the output — if there are multiple matches, note which index correspond
 **Step B — Extract with verification:**
 
 ```bash
+# Single highlight (typical for numbers):
 python3 /path/to/skill/scripts/extract_proof.py \
   --pdf "/path/to/source.pdf" \
   --search "1,250.00" \
   --page 5 \
-  --context 80 \
   --output "/path/to/output/proof_total.png" \
   --highlight value \
   --mode verify \
   --json
+
+# Multiple highlights (for policy/text questions):
+python3 /path/to/skill/scripts/extract_proof.py \
+  --pdf "/path/to/source.pdf" \
+  --search "Pets are allowed" "$25 per month" "written permission" \
+  --page 3 \
+  --output "/path/to/output/proof_pet_policy.png" \
+  --highlight value \
+  --mode verify \
+  --json --context 120
 ```
 
 Parameters:
 - `--pdf`: Path to the source PDF
-- `--search`: The exact text to find and highlight
+- `--search`: One or more text strings to find and highlight (multiple terms = multiple highlights on the same screenshot)
 - `--page`: 1-indexed page number to search on (if known; omit to search all pages)
 - `--context`: How many PDF points of vertical context to include above and below the found text (default: 80). Increase for more surrounding context.
 - `--output`: Where to save the cropped PNG
@@ -102,10 +112,12 @@ When using `--mode verify --json`, the output includes:
 }
 ```
 
-**Confidence levels:**
-- **high**: Single match on page, exact text found, verification passed
-- **medium**: Auto-selected from multiple matches, or matched via a formatting variation (e.g., searched "3,000" but matched "3,000.")
-- **low**: Verification failed (readback text doesn't match search text) — flag this to the user
+**Confidence levels (based on verification status, not match method):**
+- **high / Verified**: Readback verification passed — the highlighted region contains the expected text. Always use this when verification passes, regardless of OCR, multiple matches, or formatting variations.
+- **medium / Unverified**: Verification was not run (`--mode extract` instead of `--mode verify`). The highlight is likely correct but not confirmed.
+- **low / Check**: Verification failed — the readback text doesn't match the search text. Flag this to the user.
+
+OCR, multiple-match auto-selection, and formatting variations are **metadata** — note them in the extraction details box or screenshot caption, not in the confidence badge.
 
 **If verification fails**, the highlighted region may contain the wrong text. Re-run with `--mode find` to inspect all matches and use `--match-index` to select the correct one.
 
@@ -115,38 +127,26 @@ When using `--mode verify --json`, the output includes:
 
 After creating all the cropped screenshots, generate an HTML file. Read the template from `assets/proof_template.html` and populate it. The template expects a JSON data structure — see the template comments for the schema.
 
-Include confidence indicators in the proof page:
-- High confidence values get a green checkmark
-- Medium confidence values get a yellow warning
-- Low confidence values get a red alert prompting manual review
+Include confidence indicators in the proof page based on **verification status**:
+- Verification passed → green badge "Verified" (`confidence-high`)
+- Verification skipped → yellow badge "Unverified" (`confidence-medium`)
+- Verification failed → red badge "Check" (`confidence-low`)
 
-Alternatively, construct the HTML directly following this structure:
+OCR, multiple matches, and formatting variations are metadata — note them in the extraction details or screenshot caption, NOT in the confidence badge. If readback verification passed, the badge is always "Verified" regardless of how the match was found.
 
-```html
-<!-- Summary table at top with all values -->
-<div class="summary-box">
-  <table>
-    <tr><th>Field</th><th>Value</th><th>Source</th><th>Confidence</th></tr>
-    <!-- One row per value being verified -->
-  </table>
-</div>
+Read `assets/proof_template.html` for the exact CSS classes and schema. The template comments document the JSON data structure. Here are the key structural rules:
 
-<!-- One proof card per value -->
-<div class="proof-card">
-  <div class="proof-header">
-    <h3>Proof N: [Field Name]</h3>
-    <span class="badge">[Value]</span>
-    <span class="confidence-badge confidence-high">Verified</span>
-  </div>
-  <div class="proof-body">
-    <p>[Brief explanation of where this value comes from]</p>
-    <div class="screenshot">
-      <img src="[relative path to cropped PNG]">
-      <div class="screenshot-caption">[Source description]</div>
-    </div>
-  </div>
-</div>
-```
+**One proof card per question, not per value.** Structure cards around what the user asked, not around what was searched. A numeric question ("what's the rent?") → one card, one highlight. A policy question ("what does it say about pets?") → one card with a synthesized answer and multiple highlights.
+
+**Header highlights are mandatory.** Every proof card header must surface the answer: `<h3>Field: <span class="highlight">Answer</span></h3>`. For numbers, show the number. For text, show a short answer ("Allowed with permission, +$25/mo"). The user should get every answer from the headers alone without reading screenshots.
+
+**Multiple highlights per screenshot.** The script accepts multiple search terms (`--search "term1" "term2"`) and draws all of them on one screenshot. Use this when a question's answer spans multiple phrases.
+
+**Page metadata is plain text, not a badge.** The page number uses `<span class="badge">` which renders as subtle metadata text, not a label.
+
+**Verification is collapsible.** Use `<details class="verification">` with `<summary>Extraction details</summary>`. This is debug info, not primary content.
+
+**Screenshot captions are omitted** by default — the proof header and description provide sufficient context.
 
 #### 5. Save outputs
 

@@ -10,12 +10,25 @@ Given a PDF and a value to verify, the skill:
 
 1. **Finds** the exact text coordinates using PyMuPDF's text search
 2. **Crops** a readable section of the page around the match
-3. **Highlights** the value with a translucent green highlight
+3. **Highlights** the value with a translucent orange highlight
 4. **Verifies** by reading text back from the highlighted region to confirm correctness
-5. **Scores confidence** — single match = high, auto-selected from multiple = medium, OCR or failed verification = low
-6. **Assembles** an HTML proof page with a summary table and per-value proof cards
+5. **Assembles** an HTML proof page with a summary table and per-value proof cards
 
 The result is a standalone HTML file with embedded screenshots — a visual audit trail you can keep, share, or attach to a filing.
+
+## Examples
+
+**Tax Return** — "What's the total income, taxable income, and how much is the refund?"
+
+![Tax 1040 proof page](examples/example-tax-1040.png)
+
+**Lease Agreement** — "What's the monthly rent, security deposit, what does it say about pets, and who pays for water?"
+
+![Lease agreement proof page](examples/example-lease-agreement.png)
+
+**Mortgage Closing Disclosure** — "Who's the settlement agent, what are the total closing costs, and what's the total I'll pay over the life of the loan?"
+
+![Closing disclosure proof page](examples/example-closing-disclosure.png)
 
 ## Installation
 

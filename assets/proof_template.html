@@ -23,7 +23,8 @@
   .proof-card { background: #fff; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); margin-bottom: 2.5rem; overflow: hidden; }
   .proof-header { background: #1e293b; color: #fff; padding: 1rem 1.5rem; display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
   .proof-header h3 { font-size: 1rem; margin-right: auto; }
-  .badge { display: inline-block; background: #fbbf24; color: #1a1a1a; font-size: 0.8rem; font-weight: 700; padding: 0.2rem 0.6rem; border-radius: 4px; flex-shrink: 0; }
+  .badge { display: inline-block; color: rgba(255,255,255,0.6); font-size: 0.75rem; font-weight: 400; flex-shrink: 0; }
+  .proof-header .highlight { background: #f97316; color: #fff; padding: 0.2rem 0.5rem; border-radius: 4px; font-weight: 700; font-size: 1.05rem; }
   .proof-body { padding: 1.5rem; }
   .proof-body p { line-height: 1.6; margin-bottom: 0.75rem; }
   .highlight { background: #fef3c7; padding: 0.15rem 0.35rem; border-radius: 3px; font-weight: 600; }
@@ -32,9 +33,10 @@
   .screenshot img { width: 100%; display: block; }
   .screenshot-caption { background: #f1f5f9; padding: 0.5rem 1rem; font-size: 0.8rem; color: #64748b; border-top: 1px solid #d1d5db; }
 
-  .verification { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 1.25rem; margin-top: 1rem; }
-  .verification h4 { color: #166534; margin-bottom: 0.5rem; font-size: 0.9rem; }
-  .verification .math { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.9rem; line-height: 1.8; white-space: pre-wrap; }
+  .verification { margin-top: 1rem; }
+  .verification summary { font-size: 0.8rem; color: #999; cursor: pointer; padding: 0.5rem 0; }
+  .verification summary:hover { color: #666; }
+  .verification .math { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.8rem; line-height: 1.6; white-space: pre-wrap; color: #666; padding: 0.75rem; background: #f8f8f8; border-radius: 6px; margin-top: 0.5rem; }
 
   /* Confidence badges */
   .confidence-badge { display: inline-block; font-size: 0.7rem; font-weight: 700; padding: 0.15rem 0.5rem; border-radius: 3px; text-transform: uppercase; letter-spacing: 0.03em; }
@@ -79,11 +81,36 @@ The CONTENT section is built from a JSON structure like:
 
 Each proof becomes a summary table row + a proof card with screenshot.
 If "verification" is provided, it renders as a green calculation box below the screenshot.
-"confidence" should be "high", "medium", or "low".
-"confidence_label" is the human-readable label (e.g., "Verified", "Review", "Manual check needed").
 
-Summary table confidence column:
-- high   → green badge "Verified"
-- medium → yellow badge "Review"
-- low    → red badge "Check"
+Confidence is determined by verification status, NOT by match count or OCR:
+- "high"   → verification passed   → green badge  "Verified"
+- "medium" → verification skipped  → yellow badge "Unverified"
+- "low"    → verification failed   → red badge    "Check"
+
+OCR, multiple matches, and formatting variations are metadata — note them in the
+extraction details or screenshot caption, NOT in the confidence badge. If readback
+verification passed, the badge is always "Verified" regardless of how the match
+was found.
+
+Proof header structure:
+  <div class="proof-header">
+    <h3>Field Label: <span class="highlight">$VALUE</span></h3>
+    <span class="badge">Page N</span>                          ← subtle metadata
+    <span class="confidence-badge confidence-high">Verified</span>
+  </div>
+
+- The VALUE always goes inside h3 as a .highlight span (prominent orange)
+- For numeric values: show the number (e.g. "$39,027")
+- For text answers: show a short answer (e.g. "Landlord pays", "Allowed with permission")
+- Page number goes in a .badge span (subtle ghost text — metadata)
+- Never put the value in a .badge span
+
+Screenshot captions (.screenshot-caption) are optional and should be omitted unless
+they add context not already in the proof card header/description.
+
+Verification section uses a collapsible <details> element — it's debug info, not primary:
+  <details class="verification">
+    <summary>Extraction details</summary>
+    <div class="math">...</div>
+  </details>
 -->
